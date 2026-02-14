@@ -275,7 +275,7 @@
         <div class="d-flex justify-content-center gap-4">
             <button class="btn-game" onclick="startGameFlow('NORMAL')">KARİYER MODU 🥊</button>
             <button class="btn-game" onclick="startGameFlow('WORLD_CLASS')"
-                style="border-color:#ff1744; color:#ff1744; box-shadow: 0 0 30px rgba(255, 23, 68, 0.3);">WORLD CLASS
+                style="border-color:#ff1744; color:#ff1744; box-shadow: 0 0 30px rgba(255, 17, 68, 0.3);">WORLD CLASS
                 ☠️</button>
         </div>
 
@@ -363,10 +363,10 @@
         ];
 
         const LEVELS_WORLD_CLASS = [
-            { name: "GURU", hp: 350, dmg: 25, aggro: 0.3, speed: 2.5, color: '#00bcd4' },
-            { name: "ÜSTAD", hp: 450, dmg: 35, aggro: 0.4, speed: 2.8, color: '#76ff03' },
-            { name: "EFSANE", hp: 600, dmg: 45, aggro: 0.5, speed: 3.2, color: '#ff6d00' },
-            { name: "WORLD CHAMPION", hp: 800, dmg: 60, aggro: 0.6, speed: 4.0, color: '#d50000' }
+            { name: "GURU", hp: 350, dmg: 12, aggro: 0.3, speed: 1.2, color: '#00bcd4' },
+            { name: "ÜSTAD", hp: 450, dmg: 18, aggro: 0.4, speed: 1.5, color: '#76ff03' },
+            { name: "EFSANE", hp: 600, dmg: 25, aggro: 0.5, speed: 2.0, color: '#ff6d00' },
+            { name: "WORLD CHAMPION", hp: 800, dmg: 35, aggro: 0.6, speed: 2.5, color: '#d50000' }
         ];
 
         let CURRENT_LEVELS = LEVELS_NORMAL;
@@ -453,7 +453,8 @@
             punch(hand, type = 'NORMAL') {
                 if (this.state === 'KO' || this.state === 'HIT' || this.state === 'GUARD') return;
                 this.state = (type === 'UPPER') ? `UPPERCUT_${hand}` : `PUNCH_${hand}`;
-                this.cooldown = Math.max(10, 20 - (this.speed * 2));
+                // Speed is 1.0 by default. (12 - 2) = 10 frames.
+                this.cooldown = Math.max(5, 12 - (this.speed * 2));
                 this.vx = (type === 'UPPER') ? 5 * this.facing : 15 * this.facing;
                 this.hasHiTarget = false;
                 playSfx('swish');
@@ -559,6 +560,7 @@
             const lvl = CURRENT_LEVELS[GAME.levelIdx];
             document.getElementById('message-screen').style.display = 'none';
             document.getElementById('game-container').style.display = 'block';
+            document.getElementById('hud').style.display = 'flex';
             document.getElementById('level-indicator').innerText = lvl.name;
             document.getElementById('hud-e-name').innerText = lvl.name;
             document.getElementById('hud-e-name').style.color = lvl.color;
@@ -582,6 +584,43 @@
                 GAME.handsInitialized = true;
                 loop();
             }
+        }
+
+        function loop() {
+            requestAnimationFrame(loop);
+            if (!GAME.active) return;
+            try {
+                GAME.player.update();
+                updateAI();
+
+                // NO CROSSING PHYSICS (Updated for P Right, E Left)
+                // Enemy must be Left of Player (E.x < P.x)
+                // If E gets too close to P's left side (E.x > P.x - separation) -> Push apart
+                const separation = 100;
+                if (GAME.enemy.x > GAME.player.x - separation) {
+                    const mid = (GAME.player.x + GAME.enemy.x) / 2;
+                    GAME.enemy.x = mid - separation / 2;
+                    GAME.player.x = mid + separation / 2;
+                    if (GAME.player.vx < 0) GAME.player.vx = 0;
+                    if (GAME.enemy.vx > 0) GAME.enemy.vx = 0;
+                }
+
+                updateParticles();
+                checkCollisions();
+
+                document.getElementById('p-hp').style.width = Math.max(0, (GAME.player.hp / GAME.player.maxHp * 100)) + '%';
+                document.getElementById('e-hp').style.width = Math.max(0, (GAME.enemy.hp / GAME.enemy.maxHp * 100)) + '%';
+
+                CTX.save();
+                if (GAME.shake > 0) { CTX.translate((Math.random() - 0.5) * GAME.shake, (Math.random() - 0.5) * GAME.shake); GAME.shake *= 0.9; if (GAME.shake < 1) GAME.shake = 0; }
+                CTX.clearRect(0, 0, GAME.width, GAME.height);
+                CTX.strokeStyle = '#444'; CTX.lineWidth = 2; CTX.beginPath(); CTX.moveTo(0, GAME.groundY); CTX.lineTo(GAME.width, GAME.groundY); CTX.stroke();
+
+                GAME.player.draw(CTX);
+                GAME.enemy.draw(CTX);
+                drawParticles(CTX);
+                CTX.restore();
+            } catch (e) { console.error(e); }
         }
 
         async function initTracking() {
@@ -648,43 +687,6 @@
                     document.getElementById('msg-btn').onclick = () => startLevel();
                 }
             }, 1500);
-        }
-
-        function loop() {
-            requestAnimationFrame(loop);
-            if (!GAME.active) return;
-            try {
-                GAME.player.update();
-                updateAI();
-
-                // NO CROSSING PHYSICS (Updated for P Right, E Left)
-                // Enemy must be Left of Player (E.x < P.x)
-                // If E gets too close to P's left side (E.x > P.x - separation) -> Push apart
-                const separation = 100;
-                if (GAME.enemy.x > GAME.player.x - separation) {
-                    const mid = (GAME.player.x + GAME.enemy.x) / 2;
-                    GAME.enemy.x = mid - separation / 2; // Force E Left
-                    GAME.player.x = mid + separation / 2; // Force P Right
-                    if (GAME.player.vx < 0) GAME.player.vx = 0; // Stop P moving Left into E
-                    if (GAME.enemy.vx > 0) GAME.enemy.vx = 0;   // Stop E moving Right into P
-                }
-
-                updateParticles();
-                checkCollisions();
-
-                document.getElementById('p-hp').style.width = Math.max(0, (GAME.player.hp / GAME.player.maxHp * 100)) + '%';
-                document.getElementById('e-hp').style.width = Math.max(0, (GAME.enemy.hp / GAME.enemy.maxHp * 100)) + '%';
-
-                CTX.save();
-                if (GAME.shake > 0) { CTX.translate((Math.random() - 0.5) * GAME.shake, (Math.random() - 0.5) * GAME.shake); GAME.shake *= 0.9; if (GAME.shake < 1) GAME.shake = 0; }
-                CTX.clearRect(0, 0, GAME.width, GAME.height);
-                CTX.strokeStyle = '#444'; CTX.lineWidth = 2; CTX.beginPath(); CTX.moveTo(0, GAME.groundY); CTX.lineTo(GAME.width, GAME.groundY); CTX.stroke();
-
-                GAME.player.draw(CTX);
-                GAME.enemy.draw(CTX);
-                drawParticles(CTX);
-                CTX.restore();
-            } catch (e) { console.error(e); }
         }
 
         function updateAI() {
