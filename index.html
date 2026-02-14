@@ -89,13 +89,15 @@
             background: linear-gradient(90deg, #00b0ff, #00e5ff);
             width: 100%;
             box-shadow: 0 0 15px #00e5ff;
+            float: right;
+            /* Player on Right now */
         }
 
         .e-bar {
             background: linear-gradient(90deg, #ff1744, #d50000);
             width: 100%;
             box-shadow: 0 0 15px #ff1744;
-            float: right;
+            /* Enemy on Left, default float */
         }
 
         .name {
@@ -315,15 +317,15 @@
 
         <div id="hud">
             <div class="fighter-card text-start">
-                <div class="name" id="hud-p-name" style="color:#00e5ff;">OYUNCU</div>
-                <div class="bar-bg">
-                    <div class="hp-bar p-bar" id="p-hp"></div>
-                </div>
-            </div>
-            <div class="fighter-card text-end">
                 <div class="name" id="hud-e-name" style="color:#ff1744;">RAKİP</div>
                 <div class="bar-bg">
                     <div class="hp-bar e-bar" id="e-hp"></div>
+                </div>
+            </div>
+            <div class="fighter-card text-end">
+                <div class="name" id="hud-p-name" style="color:#00e5ff;">OYUNCU</div>
+                <div class="bar-bg">
+                    <div class="hp-bar p-bar" id="p-hp"></div>
                 </div>
             </div>
         </div>
@@ -335,8 +337,22 @@
     <script>
         window.onerror = (msg, url, line) => { const e = document.getElementById('error-box'); e.style.display = 'block'; e.innerText = `HATA: ${msg} @ ${line}`; };
 
-        const IMG_PLAYER = new Image(); IMG_PLAYER.src = 'krmz.png';
-        const IMG_ENEMY = new Image(); IMG_ENEMY.src = 'mavi.png';
+        // --- ASSET LOADING ---
+        const SPRITES_P = {
+            idle: new Image(), guard: new Image(), punchL: new Image(), punchR: new Image()
+        };
+        SPRITES_P.idle.src = 'krmz-durus.png';
+        SPRITES_P.guard.src = 'krmz-gard.png';
+        SPRITES_P.punchL.src = 'krmz-sol.png';
+        SPRITES_P.punchR.src = 'krmz-sag.png';
+
+        const SPRITES_E = {
+            idle: new Image(), guard: new Image(), punchL: new Image(), punchR: new Image()
+        };
+        SPRITES_E.idle.src = 'mavi-durus.png';
+        SPRITES_E.guard.src = 'mavi-gard.png';
+        SPRITES_E.punchL.src = 'mavi-sol.png';
+        SPRITES_E.punchR.src = 'mavi-sag.png';
 
         const LEVELS_NORMAL = [
             { name: "ACEMİ", hp: 100, dmg: 5, aggro: 0.015, speed: 1.0, color: '#8d6e63' },
@@ -361,8 +377,15 @@
         const VIDEO = document.querySelector('.input_video');
         const AUDIO_CTX = new (window.AudioContext || window.webkitAudioContext)();
 
+        window.addEventListener('resize', () => {
+            GAME.width = window.innerWidth;
+            GAME.height = window.innerHeight;
+            CANVAS.width = GAME.width;
+            CANVAS.height = GAME.height;
+            GAME.groundY = GAME.height * 0.75;
+        });
+
         const GAME = {
-            active: false,
             active: false,
             mode: 'NORMAL',
             levelIdx: 0,
@@ -376,7 +399,7 @@
         };
 
         class Fighter {
-            constructor(x, color, facing, stats, isCPU = false, image = null) {
+            constructor(x, color, facing, stats, isCPU = false, sprites = null) {
                 this.x = x; this.y = GAME.groundY;
                 this.vx = 0; this.vy = 0;
                 this.maxHp = stats.hp || 100;
@@ -386,7 +409,7 @@
                 this.speed = stats.speed || 1.0;
                 this.facing = facing;
                 this.color = color;
-                this.image = image;
+                this.sprites = sprites;
                 this.state = 'IDLE';
                 this.timer = 0;
                 this.cooldown = 0;
@@ -398,7 +421,9 @@
             update() {
                 this.x += this.vx;
                 this.vx *= 0.8;
-                if (this.x < 50) this.x = 50; if (this.x > GAME.width - 50) this.x = GAME.width - 50;
+                // Sprite width is 240, centered. So margin ~120.
+                if (this.x < 120) this.x = 120;
+                if (this.x > GAME.width - 120) this.x = GAME.width - 120;
 
                 if (this.cooldown > 0) this.cooldown--;
                 if (this.guardTimer > 0) { this.guardTimer--; if (this.guardTimer === 0 && this.state === 'GUARD') this.state = 'IDLE'; }
@@ -477,78 +502,37 @@
                     ctx.rotate((Math.random() - 0.5) * 0.3);
                 }
 
-                // DRAW IMAGE
-                if (this.image && this.image.complete) {
+                // Determine Sprite based on State
+                let currentImg = this.sprites ? this.sprites.idle : null;
+
+                if (this.sprites) {
+                    if (this.state === 'GUARD') currentImg = this.sprites.guard;
+                    else if (this.state.includes('PUNCH_L') || this.state.includes('UPPERCUT_L')) currentImg = this.sprites.punchL;
+                    else if (this.state.includes('PUNCH_R') || this.state.includes('UPPERCUT_R')) currentImg = this.sprites.punchR;
+                }
+
+                if (currentImg && currentImg.complete) {
                     ctx.save();
-                    // If CPU (Enemy), user says it needs to turn Left. 
-                    // Current Context Scale is (-1, 1). 
-                    // If Image is standard (Right-facing), it becomes Left-facing.
-                    // If Image is Left-facing, it becomes Right-facing.
-                    // If user sees it Right-facing, then Image MUST be Left-facing (Scenario B).
-                    // So we need to FLIP it inside the frame to restore its Left-facing nature.
+                    // Enemy (CPU) Orientation Fix
+                    // Assuming Enemy sprites are Left-facing natively.
+                    // We want them to face Right (facing=1).
+                    // drawImage draws normally. If native is Left, we need to flip horizontally to face Right?
+                    // Original: facing=-1 (Left), scale(-1,1) -> Result Right? No.
+                    // Let's assume Blue sprites are Left-facing.
+                    // Current setup: Enemy facing=1 (Right).
+                    // If we draw normally, it faces Left.
+                    // So we MUST flip it to face Right.
                     if (this.isCPU) {
                         ctx.scale(-1, 1);
                     }
 
                     const w = 240; const h = 320;
-                    ctx.drawImage(this.image, -w / 2, -h + 20, w, h);
+                    ctx.drawImage(currentImg, -w / 2, -h + 20, w, h);
                     ctx.restore();
                 } else {
+                    // Fallback
                     ctx.fillStyle = this.color;
                     ctx.fillRect(-40, -200, 80, 200);
-                }
-
-                // DRAW ARMS (Restored for animation)
-                // We use the same vector logic but style it to match the image
-                ctx.lineWidth = 15;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                ctx.strokeStyle = this.color;
-                ctx.fillStyle = this.color;
-
-                const s = this.state;
-                // Arms Origin (Shoulders) - Adjusted for Image height
-                const shoulderY = -200;
-
-                if (s === 'GUARD') {
-                    ctx.beginPath(); ctx.moveTo(0, shoulderY); ctx.lineTo(10, shoulderY - 30); ctx.stroke();
-                    ctx.beginPath(); ctx.arc(10, shoulderY - 30, 20, 0, Math.PI * 2); ctx.fill();
-
-                    ctx.beginPath(); ctx.moveTo(0, shoulderY); ctx.lineTo(25, shoulderY - 30); ctx.stroke();
-                    ctx.beginPath(); ctx.arc(25, shoulderY - 30, 20, 0, Math.PI * 2); ctx.fill();
-                } else {
-                    const isPunchL = (s.includes('PUNCH_L') || s.includes('UPPERCUT_L'));
-                    const isPunchR = (s.includes('PUNCH_R') || s.includes('UPPERCUT_R'));
-                    const isUpperL = s.includes('UPPERCUT_L');
-                    const isUpperR = s.includes('UPPERCUT_R');
-
-                    // Left Arm
-                    ctx.beginPath(); ctx.moveTo(-20, shoulderY);
-                    if (isPunchL) {
-                        if (isUpperL) { ctx.lineTo(30, shoulderY + 30); ctx.lineTo(50, shoulderY - 50); }
-                        else { ctx.lineTo(20, shoulderY); ctx.lineTo(120, shoulderY); }
-                    } else {
-                        ctx.lineTo(-20, shoulderY + 20); ctx.lineTo(10, shoulderY + 30);
-                    }
-                    ctx.stroke();
-                    ctx.beginPath();
-                    if (isPunchL) ctx.arc(isUpperL ? 50 : 130, isUpperL ? shoulderY - 50 : shoulderY, 25, 0, Math.PI * 2);
-                    else ctx.arc(25, shoulderY + 30, 20, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    // Right Arm
-                    ctx.beginPath(); ctx.moveTo(20, shoulderY);
-                    if (isPunchR) {
-                        if (isUpperR) { ctx.lineTo(50, shoulderY + 30); ctx.lineTo(70, shoulderY - 50); }
-                        else { ctx.lineTo(40, shoulderY); ctx.lineTo(140, shoulderY); }
-                    } else {
-                        ctx.lineTo(30, shoulderY + 20); ctx.lineTo(50, shoulderY + 40);
-                    }
-                    ctx.stroke();
-                    ctx.beginPath();
-                    if (isPunchR) ctx.arc(isUpperR ? 70 : 150, isUpperR ? shoulderY - 50 : shoulderY, 25, 0, Math.PI * 2);
-                    else ctx.arc(65, shoulderY + 40, 20, 0, Math.PI * 2);
-                    ctx.fill();
                 }
 
                 ctx.restore();
@@ -583,8 +567,10 @@
             CANVAS.width = GAME.width; CANVAS.height = GAME.height;
             GAME.groundY = GAME.height * 0.75;
 
-            GAME.player = new Fighter(GAME.width * 0.2, '#00e5ff', 1, { hp: 100, dmg: 10 }, false, IMG_PLAYER);
-            GAME.enemy = new Fighter(GAME.width * 0.8, lvl.color, -1, lvl, true, IMG_ENEMY);
+            // Player on Right (0.8), facing Left (-1)
+            GAME.player = new Fighter(GAME.width * 0.8, '#00e5ff', -1, { hp: 100, dmg: 10 }, false, SPRITES_P);
+            // Enemy on Left (0.2), facing Right (1)
+            GAME.enemy = new Fighter(GAME.width * 0.2, lvl.color, 1, lvl, true, SPRITES_E);
 
             GAME.lastDamageTime = Date.now();
             GAME.active = true;
@@ -671,14 +657,16 @@
                 GAME.player.update();
                 updateAI();
 
-                // NO CROSSING PHYSICS
+                // NO CROSSING PHYSICS (Updated for P Right, E Left)
+                // Enemy must be Left of Player (E.x < P.x)
+                // If E gets too close to P's left side (E.x > P.x - separation) -> Push apart
                 const separation = 100;
-                if (GAME.player.x > GAME.enemy.x - separation) {
+                if (GAME.enemy.x > GAME.player.x - separation) {
                     const mid = (GAME.player.x + GAME.enemy.x) / 2;
-                    GAME.player.x = mid - separation / 2;
-                    GAME.enemy.x = mid + separation / 2;
-                    if (GAME.player.vx > 0) GAME.player.vx = 0;
-                    if (GAME.enemy.vx < 0) GAME.enemy.vx = 0;
+                    GAME.enemy.x = mid - separation / 2; // Force E Left
+                    GAME.player.x = mid + separation / 2; // Force P Right
+                    if (GAME.player.vx < 0) GAME.player.vx = 0; // Stop P moving Left into E
+                    if (GAME.enemy.vx > 0) GAME.enemy.vx = 0;   // Stop E moving Right into P
                 }
 
                 updateParticles();
@@ -709,7 +697,10 @@
                 if (Math.random() < guardChance) { E.setGuard(true); E.guardTimer = 40; }
             }
             if (E.state !== 'GUARD' && E.guardTimer === 0) {
-                if (dist > 250) E.vx -= 1.5 * E.speed; else if (dist < 150) E.vx += 1.5 * E.speed;
+                // Enemy Logic (Left Side)
+                // Move towards Player (Right) -> vx should be positive (matching facing 1)
+                // Retreat -> vx should be negative
+                if (dist > 250) E.vx += 1.5 * E.speed; else if (dist < 150) E.vx -= 1.5 * E.speed;
                 if (dist < 320 && E.cooldown === 0 && Math.random() < E.aggro) {
                     const rnd = Math.random();
                     if (rnd < 0.3) E.punch('R', 'UPPER'); else E.punch(rnd < 0.6 ? 'L' : 'R');
@@ -747,8 +738,15 @@
                     if (realLeft.y < 0.35 && realRight.y < 0.35 && dist < 0.25) {
                         guarding = true; status.innerText = "GARD 🛡️";
                     } else {
-                        if (realLeft.x > realRight.x) { GAME.player.vx += 4; status.innerText = "İLERİ >>"; }
-                        else if (dist < 0.3) { GAME.player.vx -= 15; status.innerText = "<< KAÇ!"; }
+                        // Input Logic
+                        // Player on Right (facing Left, -1). 
+                        // Forward (Advance towards Enemy on Left): Move Left (-x).
+                        // Escape (Retreat to Right): Move Right (+x).
+
+                        // "Forward" Gesture (Left Hand > Right Hand? No, standard logic usually)
+                        // Original: if (realLeft.x > realRight.x) -> Approach
+                        if (realLeft.x > realRight.x) { GAME.player.vx -= 4; status.innerText = "İLERİ >>"; } // Move Left
+                        else if (dist < 0.3) { GAME.player.vx += 15; status.innerText = "<< KAÇ!"; } // Move Right
                     }
                 }
                 GAME.player.setGuard(guarding);
