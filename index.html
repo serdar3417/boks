@@ -468,7 +468,18 @@
 
             hit(dmg, srcX) {
                 if (this.state === 'KO') return;
-                if (this.state === 'GUARD') { playSfx('block'); this.vx = Math.sign(this.x - srcX) * 15; return; }
+
+                // GUARD: Reduce damage by 70% (Take 30%), play block sound.
+                if (this.state === 'GUARD') {
+                    playSfx('block');
+                    this.hp -= dmg * 0.3; // Chip damage
+                    GAME.lastDamageTime = Date.now();
+                    this.vx = Math.sign(this.x - srcX) * 10; // Reduced pushback
+                    spawnParticles(this.x, this.y - 120, 5, "#fff"); // Sparks
+                    if (this.hp <= 0) { this.hp = 0; this.state = 'KO'; endGame(this !== GAME.player); }
+                    return;
+                }
+
                 if (this.state === 'HIT') return;
 
                 this.hp -= dmg;
@@ -737,7 +748,9 @@
 
                 if (realLeft && realRight) {
                     const dx = realLeft.x - realRight.x; const dy = realLeft.y - realRight.y; const dist = Math.hypot(dx, dy);
-                    if (realLeft.y < 0.35 && realRight.y < 0.35 && dist < 0.25) {
+                    // Guard Logic: Hands high (y < 0.45) and relatively close (dist < 0.35)
+                    // Added: Check if hands are close to head height
+                    if (realLeft.y < 0.45 && realRight.y < 0.45 && dist < 0.35) {
                         guarding = true; status.innerText = "GARD 🛡️";
                     } else {
                         // Input Logic
