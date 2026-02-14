@@ -270,7 +270,12 @@
         <h1 class="display-1 fw-bold mb-4" style="color: #fff; text-shadow: 0 0 30px #00e5ff;">VISION FIGHTER</h1>
         <h3 class="mb-4 text-info">DÜNYA ŞAMPİYONASI</h3>
         <input type="text" id="player-name-input" placeholder="ADINIZI GİRİN" maxlength="15">
-        <button class="btn-game" onclick="startGameFlow()">BAŞLA 🥊</button>
+        <div class="d-flex justify-content-center gap-4">
+            <button class="btn-game" onclick="startGameFlow('NORMAL')">KARİYER MODU 🥊</button>
+            <button class="btn-game" onclick="startGameFlow('WORLD_CLASS')"
+                style="border-color:#ff1744; color:#ff1744; box-shadow: 0 0 30px rgba(255, 23, 68, 0.3);">WORLD CLASS
+                ☠️</button>
+        </div>
 
         <div class="tutorial">
             <div><span style="color:#00e5ff">YUMRUK:</span> Havaya Vur | <span style="color:#00e5ff">APARKAT:</span>
@@ -293,14 +298,15 @@
         <div id="certificate">
             <div class="belt-icon">🏆🥇👑</div>
             <div class="cert-header">BAŞARI BELGESİ</div>
-            <div class="cert-text">Bu belge, Vision Fighter Dünya Şampiyonası'nı<br>"ORDINARYÜS" seviyesinde tamamlayan
+            <div class="cert-text">Bu belge, Vision Fighter Şampiyonası'nı<br><span id="cert-rank"
+                    style="font-weight:bold; color:#d50000;">ORDINARYÜS</span> seviyesinde tamamlayan
             </div>
             <div class="cert-name" id="cert-player-name">İsim Soyisim</div>
             <div class="cert-text">tarafından kazanılmıştır.</div>
-            <h2 style="color:#bf953f; font-weight:bold;">DÜNYA ŞAMPİYONU</h2>
+            <h2 id="cert-title" style="color:#bf953f; font-weight:bold;">DÜNYA ŞAMPİYONU</h2>
             <div class="mt-4 text-muted">Vision Fighter Association © 2026</div>
         </div>
-        <button class="btn-game mt-5" onclick="location.reload()">YENİ KARİYER</button>
+        <button class="btn-game mt-5" onclick="location.reload()"> ANA MENÜYE DÖN </button>
     </div>
 
     <div id="game-container">
@@ -329,13 +335,26 @@
     <script>
         window.onerror = (msg, url, line) => { const e = document.getElementById('error-box'); e.style.display = 'block'; e.innerText = `HATA: ${msg} @ ${line}`; };
 
-        const LEVELS = [
+        const IMG_PLAYER = new Image(); IMG_PLAYER.src = 'krmz.png';
+        const IMG_ENEMY = new Image(); IMG_ENEMY.src = 'mavi.png';
+
+        const LEVELS_NORMAL = [
             { name: "ACEMİ", hp: 100, dmg: 5, aggro: 0.015, speed: 1.0, color: '#8d6e63' },
             { name: "ORTA", hp: 120, dmg: 8, aggro: 0.04, speed: 1.2, color: '#ffb74d' },
             { name: "UZMAN", hp: 150, dmg: 12, aggro: 0.08, speed: 1.5, color: '#ff1744' },
             { name: "PROFESÖR", hp: 200, dmg: 15, aggro: 0.12, speed: 1.8, color: '#d500f9' },
             { name: "ORDINARYÜS", hp: 300, dmg: 20, aggro: 0.20, speed: 2.2, color: '#ffd700' }
         ];
+
+        const LEVELS_WORLD_CLASS = [
+            { name: "GURU", hp: 350, dmg: 25, aggro: 0.3, speed: 2.5, color: '#00bcd4' },
+            { name: "ÜSTAD", hp: 450, dmg: 35, aggro: 0.4, speed: 2.8, color: '#76ff03' },
+            { name: "EFSANE", hp: 600, dmg: 45, aggro: 0.5, speed: 3.2, color: '#ff6d00' },
+            { name: "WORLD CHAMPION", hp: 800, dmg: 60, aggro: 0.6, speed: 4.0, color: '#d50000' }
+        ];
+
+        let CURRENT_LEVELS = LEVELS_NORMAL;
+
 
         const CANVAS = document.querySelector('.output_canvas');
         const CTX = CANVAS.getContext('2d');
@@ -344,6 +363,8 @@
 
         const GAME = {
             active: false,
+            active: false,
+            mode: 'NORMAL',
             levelIdx: 0,
             playerName: "OYUNCU",
             width: 1280, height: 720, groundY: 600,
@@ -355,16 +376,17 @@
         };
 
         class Fighter {
-            constructor(x, color, facing, stats, isCPU = false) {
+            constructor(x, color, facing, stats, isCPU = false, image = null) {
                 this.x = x; this.y = GAME.groundY;
                 this.vx = 0; this.vy = 0;
                 this.maxHp = stats.hp || 100;
                 this.hp = this.maxHp;
                 this.dmg = stats.dmg || 10;
                 this.aggro = stats.aggro || 0.02;
-                this.speed = stats.speed || 1.0; // Movement/Anim speed factor
+                this.speed = stats.speed || 1.0;
                 this.facing = facing;
                 this.color = color;
+                this.image = image;
                 this.state = 'IDLE';
                 this.timer = 0;
                 this.cooldown = 0;
@@ -445,8 +467,7 @@
                 ctx.translate(this.x, this.y);
                 ctx.scale(this.facing, 1);
 
-                ctx.strokeStyle = this.color; ctx.fillStyle = this.color;
-                ctx.lineWidth = 10; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                // Shadow
                 ctx.shadowBlur = 20; ctx.shadowColor = this.color;
 
                 const bob = (this.state === 'IDLE') ? Math.sin(this.timer * 0.1) * 5 : 0;
@@ -454,45 +475,94 @@
 
                 if (this.state === 'HIT') {
                     ctx.rotate((Math.random() - 0.5) * 0.3);
-                    ctx.shadowColor = '#fff'; ctx.strokeStyle = '#fff';
                 }
 
-                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-20, -70); ctx.lineTo(0, -110); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(25, -70); ctx.lineTo(0, -110); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(0, -110); ctx.lineTo(0, -190); ctx.stroke();
-                ctx.beginPath(); ctx.arc(0, -215, 22, 0, Math.PI * 2); ctx.stroke();
+                // DRAW IMAGE
+                if (this.image && this.image.complete) {
+                    ctx.save();
+                    // If CPU (Enemy), user says it needs to turn Left. 
+                    // Current Context Scale is (-1, 1). 
+                    // If Image is standard (Right-facing), it becomes Left-facing.
+                    // If Image is Left-facing, it becomes Right-facing.
+                    // If user sees it Right-facing, then Image MUST be Left-facing (Scenario B).
+                    // So we need to FLIP it inside the frame to restore its Left-facing nature.
+                    if (this.isCPU) {
+                        ctx.scale(-1, 1);
+                    }
 
-                // Arms
+                    const w = 240; const h = 320;
+                    ctx.drawImage(this.image, -w / 2, -h + 20, w, h);
+                    ctx.restore();
+                } else {
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(-40, -200, 80, 200);
+                }
+
+                // DRAW ARMS (Restored for animation)
+                // We use the same vector logic but style it to match the image
+                ctx.lineWidth = 15;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = this.color;
+                ctx.fillStyle = this.color;
+
                 const s = this.state;
+                // Arms Origin (Shoulders) - Adjusted for Image height
+                const shoulderY = -200;
+
                 if (s === 'GUARD') {
-                    ctx.beginPath(); ctx.moveTo(0, -180); ctx.lineTo(10, -200); ctx.stroke(); ctx.beginPath(); ctx.arc(10, -200, 15, 0, Math.PI * 2); ctx.fill();
-                    ctx.beginPath(); ctx.moveTo(0, -180); ctx.lineTo(25, -200); ctx.stroke(); ctx.beginPath(); ctx.arc(25, -200, 15, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.moveTo(0, shoulderY); ctx.lineTo(10, shoulderY - 30); ctx.stroke();
+                    ctx.beginPath(); ctx.arc(10, shoulderY - 30, 20, 0, Math.PI * 2); ctx.fill();
+
+                    ctx.beginPath(); ctx.moveTo(0, shoulderY); ctx.lineTo(25, shoulderY - 30); ctx.stroke();
+                    ctx.beginPath(); ctx.arc(25, shoulderY - 30, 20, 0, Math.PI * 2); ctx.fill();
                 } else {
                     const isPunchL = (s.includes('PUNCH_L') || s.includes('UPPERCUT_L'));
                     const isPunchR = (s.includes('PUNCH_R') || s.includes('UPPERCUT_R'));
                     const isUpperL = s.includes('UPPERCUT_L');
                     const isUpperR = s.includes('UPPERCUT_R');
 
-                    ctx.beginPath(); ctx.moveTo(0, -180);
-                    if (isPunchL) { if (isUpperL) { ctx.lineTo(30, -150); ctx.lineTo(50, -230); } else { ctx.lineTo(40, -180); ctx.lineTo(120, -180); } }
-                    else { ctx.lineTo(-20, -160); ctx.lineTo(10, -150); }
-                    ctx.stroke(); ctx.beginPath(); if (isPunchL) ctx.arc(isUpperL ? 50 : 130, isUpperL ? -230 : -180, 20, 0, Math.PI * 2); else ctx.arc(25, -150, 15, 0, Math.PI * 2); ctx.fill();
+                    // Left Arm
+                    ctx.beginPath(); ctx.moveTo(-20, shoulderY);
+                    if (isPunchL) {
+                        if (isUpperL) { ctx.lineTo(30, shoulderY + 30); ctx.lineTo(50, shoulderY - 50); }
+                        else { ctx.lineTo(20, shoulderY); ctx.lineTo(120, shoulderY); }
+                    } else {
+                        ctx.lineTo(-20, shoulderY + 20); ctx.lineTo(10, shoulderY + 30);
+                    }
+                    ctx.stroke();
+                    ctx.beginPath();
+                    if (isPunchL) ctx.arc(isUpperL ? 50 : 130, isUpperL ? shoulderY - 50 : shoulderY, 25, 0, Math.PI * 2);
+                    else ctx.arc(25, shoulderY + 30, 20, 0, Math.PI * 2);
+                    ctx.fill();
 
-                    ctx.beginPath(); ctx.moveTo(0, -180);
-                    if (isPunchR) { if (isUpperR) { ctx.lineTo(50, -150); ctx.lineTo(70, -230); } else { ctx.lineTo(60, -180); ctx.lineTo(140, -180); } }
-                    else { ctx.lineTo(30, -160); ctx.lineTo(50, -140); }
-                    ctx.stroke(); ctx.beginPath(); if (isPunchR) ctx.arc(isUpperR ? 70 : 150, isUpperR ? -230 : -180, 20, 0, Math.PI * 2); else ctx.arc(65, -140, 15, 0, Math.PI * 2); ctx.fill();
+                    // Right Arm
+                    ctx.beginPath(); ctx.moveTo(20, shoulderY);
+                    if (isPunchR) {
+                        if (isUpperR) { ctx.lineTo(50, shoulderY + 30); ctx.lineTo(70, shoulderY - 50); }
+                        else { ctx.lineTo(40, shoulderY); ctx.lineTo(140, shoulderY); }
+                    } else {
+                        ctx.lineTo(30, shoulderY + 20); ctx.lineTo(50, shoulderY + 40);
+                    }
+                    ctx.stroke();
+                    ctx.beginPath();
+                    if (isPunchR) ctx.arc(isUpperR ? 70 : 150, isUpperR ? shoulderY - 50 : shoulderY, 25, 0, Math.PI * 2);
+                    else ctx.arc(65, shoulderY + 40, 20, 0, Math.PI * 2);
+                    ctx.fill();
                 }
+
                 ctx.restore();
             }
         }
 
         // --- FLOW CONTROL ---
-        function startGameFlow() {
+        function startGameFlow(mode = 'NORMAL') {
             const name = document.getElementById('player-name-input').value.trim();
             if (!name) { alert("Lütfen bir isim girin!"); return; }
             GAME.playerName = name;
             GAME.levelIdx = 0;
+            GAME.mode = mode;
+            CURRENT_LEVELS = (mode === 'WORLD_CLASS') ? LEVELS_WORLD_CLASS : LEVELS_NORMAL;
 
             document.getElementById('start-screen').style.display = 'none';
             document.getElementById('hud-p-name').innerText = name;
@@ -502,7 +572,7 @@
         }
 
         async function startLevel() {
-            const lvl = LEVELS[GAME.levelIdx];
+            const lvl = CURRENT_LEVELS[GAME.levelIdx];
             document.getElementById('message-screen').style.display = 'none';
             document.getElementById('game-container').style.display = 'block';
             document.getElementById('level-indicator').innerText = lvl.name;
@@ -513,8 +583,8 @@
             CANVAS.width = GAME.width; CANVAS.height = GAME.height;
             GAME.groundY = GAME.height * 0.75;
 
-            GAME.player = new Fighter(GAME.width * 0.2, '#00e5ff', 1, { hp: 100, dmg: 10 });
-            GAME.enemy = new Fighter(GAME.width * 0.8, lvl.color, -1, lvl, true);
+            GAME.player = new Fighter(GAME.width * 0.2, '#00e5ff', 1, { hp: 100, dmg: 10 }, false, IMG_PLAYER);
+            GAME.enemy = new Fighter(GAME.width * 0.8, lvl.color, -1, lvl, true, IMG_ENEMY);
 
             GAME.lastDamageTime = Date.now();
             GAME.active = true;
@@ -542,7 +612,7 @@
 
         function nextLevel() {
             GAME.levelIdx++;
-            if (GAME.levelIdx >= LEVELS.length) {
+            if (GAME.levelIdx >= CURRENT_LEVELS.length) {
                 showChampionScreen();
             } else {
                 startLevel();
@@ -554,6 +624,16 @@
             document.getElementById('game-container').style.display = 'none';
             document.getElementById('champion-screen').style.display = 'flex';
             document.getElementById('certificate').style.display = 'block';
+
+            if (GAME.mode === 'WORLD_CLASS') {
+                document.getElementById('cert-rank').innerText = "DÜNYA EFSANESİ";
+                document.getElementById('cert-title').innerText = "EVRENİN HAKİMİ 🪐";
+                document.getElementById('cert-title').style.color = "#d50000";
+            } else {
+                document.getElementById('cert-rank').innerText = "ORDINARYÜS";
+                document.getElementById('cert-title').innerText = "DÜNYA ŞAMPİYONU";
+            }
+
             playSfx('win'); playSfx('win'); playSfx('win');
         }
 
@@ -561,14 +641,14 @@
             GAME.active = false;
             setTimeout(() => {
                 if (win) {
-                    if (GAME.levelIdx === LEVELS.length - 1) {
+                    if (GAME.levelIdx === CURRENT_LEVELS.length - 1) {
                         showChampionScreen();
                     } else {
                         const msg = document.getElementById('message-screen');
                         msg.style.display = 'flex';
                         document.querySelector('#message-screen h1').innerText = "KAZANDIN! 🏆";
                         document.querySelector('#message-screen h1').style.color = "#00e676";
-                        document.querySelector('#message-screen h3').innerText = `${LEVELS[GAME.levelIdx + 1].name} SENİ BEKLİYOR...`;
+                        document.querySelector('#message-screen h3').innerText = `${CURRENT_LEVELS[GAME.levelIdx + 1].name} SENİ BEKLİYOR...`;
                         document.getElementById('msg-btn').innerText = "SIRADAKİ SEVİYE >>";
                         document.getElementById('msg-btn').onclick = nextLevel;
                     }
