@@ -336,18 +336,6 @@
                 value="OYUNCU" style="font-size: 1.5rem; background: #333; color: white; border: none;">
         </div>
 
-        <!-- LEADERBOARD UI -->
-        <div id="leaderboard-ui" class="mb-4" style="color: #ffd700;">
-            <div class="stat-box">
-                <div style="font-size:0.8rem; color:#aaa;">TOPLAM GALİBİYET</div>
-                <div id="lb-wins" style="font-size:1.5rem; font-weight:bold;">0</div>
-            </div>
-            <div class="stat-box">
-                <div style="font-size:0.8rem; color:#aaa;">EN HIZLI NAKAVT</div>
-                <div id="lb-fastest" style="font-size:1.5rem; font-weight:bold;">--</div>
-            </div>
-        </div>
-
         <div class="d-grid gap-3 col-8 mx-auto">
             <button class="btn-game" onclick="startGameFlow('NORMAL')">KARİYER MODU 🥊</button>
             <button class="btn-game" onclick="startGameFlow('WORLD_CLASS')"
@@ -410,17 +398,24 @@
                 </div>
                 <!-- NEW BARS for Player -->
                 <div style="display:flex; justify-content:flex-end; gap:5px; margin-top:5px;">
-                    <div class="bar-bg" style="width:48%; height:15px; border-color: gold;">
-                        <div id="p-stamina" style="width:100%; height:100%; background:gold; box-shadow:0 0 5px gold;">
+                    <div style="width:48%; text-align:right;">
+                        <div class="bar-bg" style="width:100%; height:15px; border-color: gold;">
+                            <div id="p-stamina"
+                                style="width:100%; height:100%; background:gold; box-shadow:0 0 5px gold;"></div>
                         </div>
+                        <div style="font-size:10px; color:gold; font-weight:bold; margin-top:2px;">KONDİSYON</div>
                     </div>
-                    <div class="bar-bg" style="width:48%; height:15px; border-color: #00e5ff;">
-                        <div id="p-super"
-                            style="width:0%; height:100%; background:#00e5ff; box-shadow:0 0 5px #00e5ff;"></div>
+                    <div style="width:48%; text-align:right;">
+                        <div class="bar-bg" style="width:100%; height:15px; border-color: #00e5ff;">
+                            <div id="p-super"
+                                style="width:0%; height:100%; background:#00e5ff; box-shadow:0 0 5px #00e5ff;"></div>
+                        </div>
+                        <div style="font-size:10px; color:#00e5ff; font-weight:bold; margin-top:2px;">SÜPER GÜÇ</div>
                     </div>
                 </div>
-                <div id="super-text" style="font-size:12px; color:#00e5ff; font-weight:bold; opacity:0;">SUPER HAZIR!
-                </div>
+                <div id="super-text"
+                    style="font-size:12px; color:#00e5ff; font-weight:bold; opacity:0; margin-top:5px;">SUPER HAZIR!
+                    (ELLER YUKARI!)</div>
             </div>
         </div>
         <div id="game-status-text">HAZIRLAN</div>
@@ -618,6 +613,7 @@
             });
         }
 
+        // --- GLOBAL GAME STATE ---
         const GAME = {
             active: false,
             paused: false,
@@ -637,6 +633,7 @@
                 R: { x: 0, y: 0, prev: { x: 0, y: 0 }, lastPunch: 0 }
             }
         };
+
 
         class Fighter {
             constructor(x, color, facing, stats, isCPU = false, sprites = null) {
@@ -892,12 +889,24 @@
         }
 
         // --- FLOW CONTROL ---
-        function startGameFlow(mode = 'NORMAL') {
+        async function startGameFlow(mode = 'NORMAL') {
             const name = document.getElementById('player-name-input').value.trim();
             if (!name) { alert("Lütfen bir isim girin!"); return; }
             GAME.playerName = name;
             GAME.levelIdx = 0;
             GAME.mode = mode; // Store mode
+
+            // Initialize Camera & Game Loop if not already started
+            if (!GAME.handsInitialized) {
+                try {
+                    await initTracking();
+                    GAME.handsInitialized = true;
+                    loop(); // Start loop only after camera is ready
+                } catch (e) {
+                    alert("Kamera hatası: " + e);
+                    return;
+                }
+            }
 
             // CONFIG BASED ON MODE
             let enemyStats = { hp: 100, dmg: 5, aggro: 0.01, speed: 0.8, name: "ANTRENMAN KUKLASI", color: "#888" };
@@ -957,6 +966,11 @@
 
             GAME.lastDamageTime = Date.now();
             GAME.active = true;
+            GAME.round = 1; // Ensure Round 1
+            GAME.lastDamageTime = Date.now();
+            GAME.active = true;
+            GAME.round = 1; // Ensure Round 1
+            // GAME.startTime moved to startMatchNow for accuracy w/ overlay
 
             if (AUDIO_CTX.state === 'suspended') AUDIO_CTX.resume();
 
@@ -1079,8 +1093,15 @@
             GAME.waitingForStart = false;
             document.getElementById('start-overlay').style.display = 'none';
             GAME.lastTime = Date.now(); // Reset timer to avoid instant count down
+
+            // Record exact start time for Leaderboard
+            // Record exact start time for Leaderboard ALWAYS when match starts
+            GAME.startTime = Date.now();
+
             playSfx('fight'); // Fight sound
         }
+
+
 
         function nextLevel() {
             GAME.levelIdx++;
@@ -1212,22 +1233,20 @@
             document.getElementById('game-status-text').innerText = "DÖVÜŞ!";
             playSfx('fight');
             speak("Round " + GAME.round + "... FIGHT!"); // Voice Announcer
-            if (GAME.round === 1) GAME.startTime = Date.now(); // Start Clock
+            if (GAME.round === 1) {
+                // GAME.startTime = Date.now(); // REMOVED: Managed by startMatchNow only
+            }
         }
 
         function endFight() {
             GAME.fightOver = true;
             let result = "DRAW";
 
-            // LEADERBOARD UPDATE
             if (GAME.player.hp > GAME.enemy.hp && GAME.mode !== 'TRAINING') {
                 result = "VICTORY!";
-                speak("K.O.! You Win!");
-
-                const duration = (Date.now() - GAME.startTime) / 1000;
-                Leaderboard.addWin(duration);
+                speak("K.O. You Win");
             }
-            else if (GAME.enemy.hp > GAME.player.hp) { result = "DEFEAT!"; speak("K.O.! You Lose!"); }
+            else if (GAME.enemy.hp > GAME.player.hp) { result = "DEFEAT"; speak("K.O. You Lose"); }
 
             alert("MAÇ BİTTİ: " + result);
             location.reload(); // Simple reset for now
@@ -1510,53 +1529,34 @@
         function speak(text) {
             if ('speechSynthesis' in window) {
                 const utterance = new SpeechSynthesisUtterance(text);
-                utterance.pitch = 0.8; // Lower pitch for announcer vibe
-                utterance.rate = 1.1;
+                utterance.pitch = 0.9;
+                utterance.rate = 1.0;
                 utterance.volume = 1.0;
-                // Try to find English voice if possible for "Round 1 Fight"
+
                 const voices = window.speechSynthesis.getVoices();
-                const enVoice = voices.find(v => v.lang.startsWith('en'));
-                if (enVoice) utterance.voice = enVoice;
+                // Filter for native English (US/UK) and avoid voices that might be localized incorrectly
+                const nativeEnVoice = voices.find(v => (v.name.includes("Google") || v.name.includes("Microsoft")) && (v.lang === 'en-US' || v.lang === 'en-GB'))
+                    || voices.find(v => v.lang === 'en-US' || v.lang === 'en-GB')
+                    || voices.find(v => v.lang.startsWith('en'));
+
+                if (nativeEnVoice) {
+                    utterance.voice = nativeEnVoice;
+                    utterance.lang = 'en-US';
+                }
 
                 window.speechSynthesis.speak(utterance);
             }
         }
 
-        // --- LEADERBOARD SYSTEM ---
-        const Leaderboard = {
-            data: { wins: 0, fastestKO: 9999 },
-            load: function () {
-                const stored = localStorage.getItem('visionBoxerStats');
-                if (stored) {
-                    this.data = JSON.parse(stored);
-                }
-                this.updateUI();
-            },
-            save: function () {
-                localStorage.setItem('visionBoxerStats', JSON.stringify(this.data));
-                this.updateUI();
-            },
-            addWin: function (duration) {
-                this.data.wins++;
-                if (duration < this.data.fastestKO) {
-                    this.data.fastestKO = duration;
-                    speak("New Record!");
-                }
-                this.save();
-            },
-            updateUI: function () {
-                const elWins = document.getElementById('lb-wins');
-                const elFast = document.getElementById('lb-fastest');
-                if (elWins && elFast) {
-                    elWins.innerText = this.data.wins;
-                    elFast.innerText = (this.data.fastestKO === 9999) ? "--" : this.data.fastestKO.toFixed(1) + "s";
-                }
-            }
-        };
+        console.log("SCRIPT LOADED SUCCESSFULLY");
 
-        // Init Leaderboard on Load
-        Leaderboard.load();
+        // --- BOOTSTRAP ---
+        // Ensure functions are global
+        window.startGameFlow = startGameFlow;
+        window.startMatchNow = startMatchNow;
 
+        // Don't auto-start tracking. Wait for button click.
+        console.log("Ready to start. Waiting for user input.");
     </script>
 </body>
 
