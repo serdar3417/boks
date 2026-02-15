@@ -53,13 +53,10 @@
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 1000;
-            /* FORCE TOP */
-            border: 5px solid red;
-            /* VISIBILITY DEBUG */
-            background: rgba(0, 0, 0, 0.1);
-            /* See-through to check overlapping */
+            z-index: 10;
         }
+
+
 
         /* HUD */
         #hud {
@@ -95,18 +92,18 @@
         }
 
         .p-bar {
-            background: linear-gradient(90deg, #00b0ff, #00e5ff);
-            width: 100%;
-            box-shadow: 0 0 15px #00e5ff;
-            float: right;
-            /* Player on Right now */
-        }
-
-        .e-bar {
             background: linear-gradient(90deg, #ff1744, #d50000);
             width: 100%;
             box-shadow: 0 0 15px #ff1744;
-            /* Enemy on Left, default float */
+            float: right;
+            /* Player (Red) on Right */
+        }
+
+        .e-bar {
+            background: linear-gradient(90deg, #00b0ff, #00e5ff);
+            width: 100%;
+            box-shadow: 0 0 15px #00e5ff;
+            /* Enemy (Blue) on Left */
         }
 
         .name {
@@ -280,12 +277,23 @@
     <div id="start-screen" class="screen">
         <h1 class="display-1 fw-bold mb-4" style="color: #fff; text-shadow: 0 0 30px #00e5ff;">VISION FIGHTER</h1>
         <h3 class="mb-4 text-info">DÜNYA ŞAMPİYONASI</h3>
+
+        <!-- MOVED ABOUT BUTTON HERE -->
+        <button id="btn-about" class="btn-game"
+            style="font-size: 1rem; padding: 10px 30px; border-color: #00e5ff; color: #00e5ff; margin-bottom: 20px; position:relative; z-index:200;"
+            onclick="document.getElementById('about-modal').style.display='block'; if(typeof GAME!=='undefined') GAME.paused=true;">
+            ℹ️ OYUN HAKKINDA / NASIL OYNANIR
+        </button>
+
         <input type="text" id="player-name-input" placeholder="ADINIZI GİRİN" maxlength="15">
         <div class="d-flex justify-content-center gap-4">
             <button class="btn-game" onclick="startGameFlow('NORMAL')">KARİYER MODU 🥊</button>
             <button class="btn-game" onclick="startGameFlow('WORLD_CLASS')"
                 style="border-color:#ff1744; color:#ff1744; box-shadow: 0 0 30px rgba(255, 17, 68, 0.3);">WORLD CLASS
                 ☠️</button>
+            <button class="btn-game" onclick="startGameFlow('TRAINING')"
+                style="border-color:#00e676; color:#00e676; box-shadow: 0 0 30px rgba(0, 230, 118, 0.3);">ANTRENMAN
+                🏋️</button>
         </div>
 
         <div class="tutorial">
@@ -352,8 +360,109 @@
             </div>
         </div>
         <div id="game-status-text">HAZIRLAN</div>
+
+        <!-- ROUND TIMER UI - Repositioned (Just below camera) -->
+        <div style="position: absolute; top: 210px; width: 100%; text-align: center; z-index: 15;">
+            <div
+                style="background: rgba(0,0,0,0.5); border: 2px solid white; border-radius: 10px; padding: 5px 20px; display: inline-block;">
+                <div id="round-disp" style="color: gold; font-size: 20px; font-weight: bold;">RAUND 1</div>
+                <div id="timer-disp" style="color: white; font-size: 40px; font-weight: bold;">60</div>
+            </div>
+        </div>
+
         <div id="level-indicator">SEVİYE 1</div>
         <div id="regen-indicator">❤️ İYİLEŞİYOR...</div>
+
+
+
+        <!-- START MATCH OVERLAY -->
+        <div id="start-overlay"
+            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 5000; display: none; justify-content: center; align-items: center;">
+            <button class="btn-game"
+                style="font-size: 4rem; padding: 30px 80px; background: #00e676; color: black; border-color: #00e676; box-shadow: 0 0 50px #00e676;"
+                onclick="startMatchNow()">
+                BAŞLA! 🥊
+            </button>
+        </div>
+    </div>
+
+    <!-- MOVED ABOUT MODAL OUTSIDE GAME CONTAINER -->
+    <div id="about-modal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 3000; backdrop-filter: blur(5px); overflow-y: auto;">
+        <div
+            style="max-width: 800px; margin: 50px auto; background: rgba(20, 20, 20, 0.95); border: 1px solid #333; padding: 40px; border-radius: 12px; box-shadow: 0 0 50px rgba(0, 229, 255, 0.1); position: relative;">
+            <button id="btn-close-about"
+                style="position: absolute; top: 20px; right: 20px; background: none; border: none; color: #666; font-size: 24px; cursor: pointer;"
+                onclick="document.getElementById('about-modal').style.display='none'; if(typeof GAME!=='undefined') GAME.paused=false;">✕</button>
+            <h1
+                style="color: #00e5ff; margin-bottom: 30px; text-align: center; text-transform: uppercase; letter-spacing: 2px; border-bottom: 2px solid #333; padding-bottom: 20px;">
+                Vision Fighter - OYUN REHBERİ
+            </h1>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+                <!-- LEFT COLUMN: CONTROLS -->
+                <div>
+                    <h3 style="color: gold; display: flex; align-items: center; gap: 10px;">
+                        🥊 KONTROLLER
+                    </h3>
+                    <p style="color: #bbb; font-size: 0.9rem;">Kamera karşısına geçin. Elleriniz boks eldiveni
+                        gibidir.</p>
+
+                    <div
+                        style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+                        <strong style="color: #ff4081;">YUMRUK ATMA</strong>
+                        <ul style="margin: 5px 0; padding-left: 20px; color: #ddd;">
+                            <li><strong>Direk Vuruş:</strong> Elinizi kameraya doğru uzatın (Yumruk atar gibi).</li>
+                            <li><strong>Aparkat:</strong> Elinizi aşağıdan yukarıya hızlıca kaldırın.</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
+                        <strong style="color: #00e676;">SAVUNMA & HAREKET</strong>
+                        <ul style="margin: 5px 0; padding-left: 20px; color: #ddd;">
+                            <li><strong>Gard Al:</strong> İki elinizi yüz hizanıza kaldırın (Yüzünü koru!).</li>
+                            <li><strong>Kaçış (Dodge):</strong> Vücudunuzu sağa veya sola eğin (Kamerada ellerinizi
+                                o yöne götürün).</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN: MECHANICS -->
+                <div>
+                    <h3 style="color: cyan; display: flex; align-items: center; gap: 10px;">
+                        ⚡ OYUN MEKANİKLERİ
+                    </h3>
+
+                    <div style="margin-bottom: 15px;">
+                        <strong style="color: gold;">🟡 STAMINA (ENERJİ)</strong>
+                        <p style="color: #ccc; font-size: 0.9rem;">Her yumruk enerji harcar. Enerjin biterse
+                            yorulursun ve vuruş yapamazsın! Bekleyerek veya gard alarak enerjini topla.</p>
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <strong style="color: #00e5ff;">🔵 SÜPER GÜÇ (ULTIMATE)</strong>
+                        <p style="color: #ccc; font-size: 0.9rem;">Rakibe vurdukça mavi bar dolar. Dolduğunda
+                            <strong>İKİ ELİNİ HAVAYA KALDIR</strong> ve rakibi yok et!
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 15px;">
+                        <strong style="color: #ff1744;">❤️ CAN YENİLEME</strong>
+                        <p style="color: #ccc; font-size: 0.9rem;">Bir süre hasar almazsan canın yavaşça yenilenir.
+                            Stratejik oyna!</p>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                style="margin-top: 30px; padding: 20px; background: linear-gradient(90deg, rgba(255, 215, 0, 0.1), transparent); border-left: 4px solid gold; border-radius: 4px;">
+                <h4 style="margin: 0 0 5px 0; color: gold;">💡 İPUÇLARI</h4>
+                <p style="margin: 0; color: #ddd; font-style: italic;">
+                    "Sadece saldırmak yetmez. Rakibini izle, o saldırdığında gard al veya kaç, boşa düştüğünde
+                    cezalandır!"
+                </p>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -361,20 +470,31 @@
 
         // --- ASSET LOADING ---
         const SPRITES_P = {
-            idle: new Image(), guard: new Image(), punchL: new Image(), punchR: new Image()
+            idle: new Image(), guard: new Image(), punchL: new Image(), punchR: new Image(), ko: new Image()
         };
         SPRITES_P.idle.src = 'krmz-durus.png';
         SPRITES_P.guard.src = 'krmz-gard.png';
         SPRITES_P.punchL.src = 'krmz-sol.png';
         SPRITES_P.punchR.src = 'krmz-sag.png';
+        SPRITES_P.ko.src = 'krmz-nakavt.png';
 
         const SPRITES_E = {
-            idle: new Image(), guard: new Image(), punchL: new Image(), punchR: new Image()
+            idle: new Image(), guard: new Image(), punchL: new Image(), punchR: new Image(), ko: new Image()
         };
         SPRITES_E.idle.src = 'mavi-durus.png';
         SPRITES_E.guard.src = 'mavi-gard.png';
         SPRITES_E.punchL.src = 'mavi-sol.png';
         SPRITES_E.punchR.src = 'mavi-sag.png';
+        SPRITES_E.ko.src = 'mavi-nakavt.png';
+
+        // NEW: TRAINING DUMMY SPRITES
+        const SPRITES_TRAINING = {
+            idle: new Image(), left: new Image(), right: new Image(), ko: new Image()
+        };
+        SPRITES_TRAINING.idle.src = 'kt.png';
+        SPRITES_TRAINING.left.src = 'kt.sol.png';
+        SPRITES_TRAINING.right.src = 'kt.sag.png';
+        SPRITES_TRAINING.ko.src = 'kt.png'; // No KO for bag really, but fallback
 
         const LEVELS_NORMAL = [
             { name: "ACEMİ", hp: 100, dmg: 5, aggro: 0.015, speed: 1.0, color: '#8d6e63' },
@@ -407,10 +527,38 @@
             GAME.groundY = GAME.height * 0.75;
         });
 
+        // --- MODAL LOGIC ---
+        const btnAbout = document.getElementById('btn-about');
+        const modalAbout = document.getElementById('about-modal');
+        const btnCloseAbout = document.getElementById('btn-close-about');
+
+        if (btnAbout && modalAbout && btnCloseAbout) {
+            btnAbout.addEventListener('click', () => {
+                modalAbout.style.display = 'block';
+                if (typeof GAME !== 'undefined') GAME.paused = true;
+            });
+
+            btnCloseAbout.addEventListener('click', () => {
+                modalAbout.style.display = 'none';
+                if (typeof GAME !== 'undefined') GAME.paused = false;
+            });
+
+            // Close on outside click
+            modalAbout.addEventListener('click', (e) => {
+                if (e.target === modalAbout) {
+                    modalAbout.style.display = 'none';
+                    if (typeof GAME !== 'undefined') GAME.paused = false;
+                }
+            });
+        }
+
         const GAME = {
             active: false,
+            paused: false,
+            waitingForStart: false, // New Flag
             mode: 'NORMAL',
             levelIdx: 0,
+            round: 1, // Initialize Round
             playerName: "OYUNCU",
             width: 1280, height: 720, groundY: 600,
             player: null, enemy: null,
@@ -444,6 +592,10 @@
                 this.stamina = 100; this.maxStamina = 100;
                 this.superMeter = 0; this.maxSuper = 100;
                 this.combo = 0; this.comboTimer = 0;
+
+                // Special for Sandbag
+                this.isSandbag = (sprites === SPRITES_TRAINING);
+                this.swayTimer = 0;
             }
 
             update() {
@@ -485,6 +637,7 @@
                 }
 
                 this.timer++;
+                if (this.swayTimer > 0) this.swayTimer--;
             }
 
             punch(hand, type = 'NORMAL') {
@@ -507,6 +660,7 @@
 
 
             setGuard(active) {
+                if (this.isSandbag) return; // Sandbag cannot guard
                 if (this.state === 'KO' || this.state === 'HIT' || this.state.startsWith('PUNCH')) return;
                 if (active) { this.state = 'GUARD'; }
                 else if (this.state === 'GUARD') this.state = 'IDLE';
@@ -526,7 +680,7 @@
                     return;
                 }
 
-                if (this.state === 'HIT') return;
+                if (this.state === 'HIT' && !this.isSandbag) return; // Sandbag can be hit repeatedly for effect
 
                 // Successful Hit Logic
                 // Identify Attacker (Reverse of 'this') - Assuming GAME.player/GAME.enemy global access
@@ -540,17 +694,29 @@
                 GAME.lastDamageTime = Date.now();
                 this.state = 'HIT';
                 this.cooldown = 30; // Stun time
-                this.vx = Math.sign(this.x - srcX) * 25;
-                if (this.vx === 0) this.vx = this.facing * -25;
+
+                // NO MOVEMENT FOR SANDBAG
+                if (!this.isSandbag) {
+                    this.vx = Math.sign(this.x - srcX) * 25;
+                    if (this.vx === 0) this.vx = this.facing * -25;
+                } else {
+                    this.vx = 0;
+                }
 
                 GAME.shake = 15;
                 playSfx('hit');
                 spawnParticles(this.x, this.y - 120, 15, this.color);
                 spawnPop(this.x, this.y - 150, "POW!", "#fff");
 
+                // Sandbag doesn't die easily in training
                 if (this.hp <= 0) {
                     this.hp = 0; this.state = 'KO';
                     endGame(this !== GAME.player);
+                }
+
+                // TRIGGER SWAY FOR SANDBAG
+                if (this.isSandbag) {
+                    this.swayTimer = 30; // 0.5s approx (at 60fps)
                 }
             }
 
@@ -573,17 +739,40 @@
                 let currentImg = this.sprites ? this.sprites.idle : null;
 
                 if (this.sprites) {
-                    if (this.state === 'GUARD') currentImg = this.sprites.guard;
-                    else if (this.state.includes('PUNCH_L') || this.state.includes('UPPERCUT_L')) currentImg = this.sprites.punchL;
-                    else if (this.state.includes('PUNCH_R') || this.state.includes('UPPERCUT_R')) currentImg = this.sprites.punchR;
+                    if (this.isSandbag) {
+                        // SANDBAG ANIMATION: Left -> idle -> Right -> idle
+                        // SwayTimer: 30..20 (Left), 20..10 (Idle), 10..0 (Right) - Simplified
+                        // Request: kt.sol (Left) -> kt (Idle) -> kt.sag (Right) -> kt (Idle)
+                        if (this.swayTimer > 20) currentImg = this.sprites.left;
+                        else if (this.swayTimer > 10) currentImg = this.sprites.idle;
+                        else if (this.swayTimer > 0) currentImg = this.sprites.right;
+                        else currentImg = this.sprites.idle;
+                    } else {
+                        if (this.state === 'KO') currentImg = this.sprites.ko;
+                        else if (this.state === 'GUARD') currentImg = this.sprites.guard;
+                        else if (this.state.includes('PUNCH_L') || this.state.includes('UPPERCUT_L')) currentImg = this.sprites.punchL;
+                        else if (this.state.includes('PUNCH_R') || this.state.includes('UPPERCUT_R')) currentImg = this.sprites.punchR;
+                    }
                 }
 
                 // DRAW SPRITE
                 if (currentImg && currentImg.complete && currentImg.naturalWidth > 0) {
                     ctx.save();
                     if (this.isCPU) { ctx.scale(-1, 1); }
-                    const w = 240; const h = 320;
-                    ctx.drawImage(currentImg, -w / 2, -h + 60, w, h);
+
+                    let w = 240;
+                    let h = 320;
+                    let yOffset = -h + 40;
+
+                    if (this.state === 'KO') {
+                        // Adjusted size/pos for knockout image
+                        w = 300;
+                        h = 300;
+                        yOffset = -h + 100; // Lower to ground
+                    }
+
+                    // Position Correction: Raised by 20px (-h + 40)
+                    ctx.drawImage(currentImg, -w / 2, yOffset, w, h);
                     ctx.restore();
                 } else {
                     ctx.fillStyle = this.color;
@@ -600,8 +789,25 @@
             if (!name) { alert("Lütfen bir isim girin!"); return; }
             GAME.playerName = name;
             GAME.levelIdx = 0;
-            GAME.mode = mode;
-            CURRENT_LEVELS = (mode === 'WORLD_CLASS') ? LEVELS_WORLD_CLASS : LEVELS_NORMAL;
+            GAME.mode = mode; // Store mode
+
+            // CONFIG BASED ON MODE
+            let enemyStats = { hp: 100, dmg: 5, aggro: 0.01, speed: 0.8, name: "ANTRENMAN KUKLASI", color: "#888" };
+
+            if (mode === 'TRAINING') {
+                GAME.totalRounds = 999; // Infinite
+                GAME.roundTime = 9999; // Infinite Time
+                enemyStats = { hp: 10000, dmg: 0, aggro: 0, speed: 0, name: "KUM TORBASI", color: "#888" };
+                CURRENT_LEVELS = [{ name: "KUM TORBASI", color: "#888", hp: 10000, dmg: 0, aggro: 0, speed: 0 }]; // Dummy level for training
+            } else if (mode === 'WORLD_CLASS') {
+                CURRENT_LEVELS = LEVELS_WORLD_CLASS;
+                GAME.totalRounds = 3;
+                GAME.roundTime = 60; // Standard 60s
+            } else {
+                CURRENT_LEVELS = LEVELS_NORMAL;
+                GAME.totalRounds = 3;
+                GAME.roundTime = 60; // Standard 60s
+            }
 
             document.getElementById('start-screen').style.display = 'none';
             document.getElementById('hud-p-name').innerText = name;
@@ -611,7 +817,7 @@
         }
 
         async function startLevel() {
-            const lvl = CURRENT_LEVELS[GAME.levelIdx];
+            const lvl = (GAME.mode === 'TRAINING') ? CURRENT_LEVELS[0] : CURRENT_LEVELS[GAME.levelIdx];
             document.getElementById('message-screen').style.display = 'none';
             document.getElementById('game-container').style.display = 'block';
             document.getElementById('hud').style.display = 'flex';
@@ -624,9 +830,19 @@
             GAME.groundY = GAME.height * 0.75;
 
             // Player on Right (0.8), facing Left (-1)
-            GAME.player = new Fighter(GAME.width * 0.8, '#00e5ff', -1, { hp: 100, dmg: 10 }, false, SPRITES_P);
-            // Enemy on Left (0.2), facing Right (1)
-            GAME.enemy = new Fighter(GAME.width * 0.2, lvl.color, 1, lvl, true, SPRITES_E);
+            GAME.player = new Fighter(GAME.width * 0.8, '#d50000', -1, { hp: 100, dmg: 10 }, false, SPRITES_P); // Player Red
+
+            // Enemy
+            let enemySprites = SPRITES_E;
+            let enemyX = GAME.width * 0.2; // Default starting X
+
+            if (GAME.mode === 'TRAINING') {
+                enemySprites = SPRITES_TRAINING;
+                enemyX = GAME.width * 0.6; // Closer to player (who is at 0.8)
+            }
+
+            // Enemy on Left, facing Right (1)
+            GAME.enemy = new Fighter(enemyX, lvl.color, 1, lvl, true, enemySprites);
 
             GAME.lastDamageTime = Date.now();
             GAME.active = true;
@@ -640,6 +856,14 @@
 
             // START LOOP IMMEDIATELY (Don't wait for camera)
             if (!GAME.active) { GAME.active = true; }
+
+            // SHOW START OVERLAY WITH DELAY
+            GAME.waitingForStart = true;
+            document.getElementById('start-overlay').style.display = 'none'; // Hidden initially
+            setTimeout(() => {
+                document.getElementById('start-overlay').style.display = 'flex';
+            }, 3000); // 3 Seconds Delay
+
             loop();
 
             // Initialize Tracking in Background
@@ -658,37 +882,56 @@
             requestAnimationFrame(loop);
             if (!GAME.active) return;
             try {
-                GAME.player.update();
-                updateAI();
+                // UPDATE LOGIC - Only if not waiting
+                if (!GAME.waitingForStart && !GAME.paused) {
+                    GAME.player.update();
+                    updateAI();
 
-                // NO CROSSING PHYSICS (Updated for P Right, E Left)
-                // Enemy must be Left of Player (E.x < P.x)
-                // If E gets too close to P's left side (E.x > P.x - separation) -> Push apart
-                const separation = 100;
-                if (GAME.enemy.x > GAME.player.x - separation) {
-                    const mid = (GAME.player.x + GAME.enemy.x) / 2;
-                    GAME.enemy.x = mid - separation / 2;
-                    GAME.player.x = mid + separation / 2;
-                    if (GAME.player.vx < 0) GAME.player.vx = 0;
-                    if (GAME.enemy.vx > 0) GAME.enemy.vx = 0;
-                }
+                    // --- ROUND LOGIC ---
+                    if (!GAME.isResting && !GAME.fightOver) {
+                        // Decrease Timer
+                        if (!GAME.lastTime) GAME.lastTime = Date.now();
+                        const now = Date.now();
+                        if (now - GAME.lastTime >= 1000) {
+                            GAME.roundTime--;
+                            GAME.lastTime = now;
+                            if (GAME.roundTime <= 0) {
+                                endRound();
+                            }
+                        }
+                        // Update UI
+                        document.getElementById('timer-disp').innerText = GAME.roundTime;
+                        document.getElementById('round-disp').innerText = "RAUND " + GAME.round;
+                    }
 
-                updateParticles();
-                if (typeof updateVFX === 'function') updateVFX(); // Add VFX Update
-                checkCollisions();
+                    // NO CROSSING PHYSICS (Updated for P Right, E Left)
+                    // Enemy must be Left of Player (E.x < P.x)
+                    // If E gets too close to P's left side (E.x > P.x - separation) -> Push apart
+                    const separation = 100;
+                    if (GAME.enemy.x > GAME.player.x - separation) {
+                        const mid = (GAME.player.x + GAME.enemy.x) / 2;
+                        GAME.enemy.x = mid - separation / 2;
+                        GAME.player.x = mid + separation / 2;
+                        if (GAME.player.vx < 0) GAME.player.vx = 0;
+                        if (GAME.enemy.vx > 0) GAME.enemy.vx = 0;
+                    }
 
-                document.getElementById('p-hp').style.width = Math.max(0, (GAME.player.hp / GAME.player.maxHp * 100)) + '%';
-                document.getElementById('e-hp').style.width = Math.max(0, (GAME.enemy.hp / GAME.enemy.maxHp * 100)) + '%';
+                    updateParticles();
+                    if (typeof updateVFX === 'function') updateVFX(); // Add VFX Update
+                    checkCollisions();
 
-                // Update New Bars
-                document.getElementById('p-stamina').style.width = GAME.player.stamina + '%';
-                document.getElementById('p-super').style.width = GAME.player.superMeter + '%';
+                    // Update New Bars
+                    document.getElementById('p-hp').style.width = Math.max(0, (GAME.player.hp / GAME.player.maxHp * 100)) + '%';
+                    document.getElementById('e-hp').style.width = Math.max(0, (GAME.enemy.hp / GAME.enemy.maxHp * 100)) + '%';
+                    document.getElementById('p-stamina').style.width = GAME.player.stamina + '%';
+                    document.getElementById('p-super').style.width = GAME.player.superMeter + '%';
 
-                if (GAME.player.superMeter >= 100) {
-                    document.getElementById('super-text').style.opacity = (Math.floor(Date.now() / 200) % 2); // Blink
-                } else {
-                    document.getElementById('super-text').style.opacity = 0;
-                }
+                    if (GAME.player.superMeter >= 100) {
+                        document.getElementById('super-text').style.opacity = (Math.floor(Date.now() / 200) % 2); // Blink
+                    } else {
+                        document.getElementById('super-text').style.opacity = 0;
+                    }
+                } // End if !waitingForStart
 
                 CTX.save();
                 if (GAME.shake > 0) { CTX.translate((Math.random() - 0.5) * GAME.shake, (Math.random() - 0.5) * GAME.shake); GAME.shake *= 0.9; if (GAME.shake < 1) GAME.shake = 0; }
@@ -719,6 +962,13 @@
                 width: 640, height: 360
             });
             await cam.start();
+        }
+
+        function startMatchNow() {
+            GAME.waitingForStart = false;
+            document.getElementById('start-overlay').style.display = 'none';
+            GAME.lastTime = Date.now(); // Reset timer to avoid instant count down
+            playSfx('fight'); // Fight sound
         }
 
         function nextLevel() {
@@ -807,10 +1057,64 @@
             ctx.globalAlpha = 1;
         }
 
+        function endRound() {
+            if (GAME.round >= GAME.totalRounds) {
+                endFight();
+                return;
+            }
+
+            GAME.isResting = true;
+            document.getElementById('game-status-text').innerText = "RAUND ARASI - DİNLEN! (+20 HP)";
+            // Heal
+            GAME.player.hp = Math.min(GAME.player.hp + 20, GAME.player.maxHp);
+            GAME.enemy.hp = Math.min(GAME.enemy.hp + 20, GAME.enemy.maxHp);
+
+            playSfx('win'); // Bell sound placeholder
+
+            let restTime = 10;
+            const restInterval = setInterval(() => {
+                document.getElementById('timer-disp').innerText = "DİNLEN: " + restTime;
+                restTime--;
+                if (restTime < 0) {
+                    clearInterval(restInterval);
+                    startNextRound();
+                }
+            }, 1000);
+        }
+
+        function startNextRound() {
+            GAME.round++;
+            GAME.roundTime = 60;
+            GAME.isResting = false;
+            GAME.player.x = GAME.width * 0.8; // Reset Pos
+            GAME.enemy.x = GAME.width * 0.2;
+            document.getElementById('game-status-text').innerText = "DÖVÜŞ!";
+            playSfx('fight');
+        }
+
+        function endFight() {
+            GAME.fightOver = true;
+            let result = "BERABERE";
+            if (GAME.player.hp > GAME.enemy.hp) result = "KAZANDIN! 🏆";
+            else if (GAME.enemy.hp > GAME.player.hp) result = "KAYBETTİN! 💀";
+
+            alert("MAÇ BİTTİ: " + result);
+            location.reload(); // Simple reset for now
+        }
+
         function updateAI() {
             const E = GAME.enemy; const P = GAME.player;
             if (E.state === 'KO' || E.state === 'HIT') { E.update(); return; }
-            const dist = Math.abs(P.x - E.x);
+
+            // TRAINING MODE: Passive Sandbag
+            if (GAME.mode === 'TRAINING') {
+                E.update();
+                // Optional: Random guard to practice guard breaking?
+                // For now, completely passive.
+                return;
+            }
+
+            E.timer++; const dist = Math.abs(P.x - E.x);
 
             if ((P.state.startsWith('PUNCH') || P.state.startsWith('UPPERCUT')) && dist < 350 && E.state !== 'GUARD') {
                 const guardChance = GAME.levelIdx * 0.12 + 0.1;
@@ -903,6 +1207,39 @@
                 if (vy < -20 && Math.abs(vy) > Math.abs(vx)) GAME.player.punch(side, 'UPPER');
                 else GAME.player.punch(side, 'NORMAL');
             }
+        }
+
+        // --- PARTICLE SYSTEM ---
+        function spawnParticles(x, y, count, color) {
+            for (let i = 0; i < count; i++) {
+                GAME.particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function updateParticles() {
+            for (let i = GAME.particles.length - 1; i >= 0; i--) {
+                let p = GAME.particles[i];
+                p.x += p.vx; p.y += p.vy;
+                p.life -= 0.05;
+                if (p.life <= 0) GAME.particles.splice(i, 1);
+            }
+        }
+
+        function drawParticles(ctx) {
+            GAME.particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
         }
 
         // --- VFX SYSTEM ---
